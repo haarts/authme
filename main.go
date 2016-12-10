@@ -1,33 +1,151 @@
 package main
 
 import (
+	"crypto/rand"
+	"database/sql"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
+
+	_ "github.com/mattn/go-sqlite3"
+	"github.com/pzduniak/argon2"
 )
 
-func registerHandler(w http.ResponseWriter, r *http.Request) {
+// FIXME why export this?
+type App struct {
+	db *sql.DB
+}
+
+func secureSalt() ([]byte, error) {
+	salt := make([]byte, 64)
+
+	_, err := rand.Read(salt)
+	if err != nil {
+		return salt, err
+	}
+
+	return salt, nil
+}
+
+func encryptPassword(salt []byte, password string) ([]byte, error) {
+	// TODO check out these parameters
+	encryptedPassword, err := argon2.Key([]byte(password), salt, 13, 4, 4096, 32, argon2.Argon2i)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	return encryptedPassword, nil
+}
+
+func (a *App) storeUser(username, password string) error {
+	salt, err := secureSalt()
+	if err != nil {
+		return err
+	}
+
+	encryptedPassword, err := encryptPassword(salt, password)
+	if err != nil {
+		return err
+	}
+
+	_, err = a.db.Exec(
+		"INSERT INTO users (username, encrypted_password, salt) VALUES ($1, $2, $3)",
+		username,
+		hex.EncodeToString(encryptedPassword),
+		hex.EncodeToString(salt),
+	)
+
+	return err
+}
+
+func extractUserNameAndPassword(r *http.Request) (string, string, error) {
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest) // TODO this returns 'plain/text' which is wrong
-		return
+		return "", "", err
 	}
 	if r.PostFormValue("username") == "" {
-		http.Error(w, "'username' missing", http.StatusBadRequest)
-		return
+		return "", "", errors.New("'username' must be present")
 	}
 	if r.PostFormValue("password") == "" {
-		http.Error(w, "'password' missing", http.StatusBadRequest)
+		return "", "", errors.New("'password' must be present")
+	}
+
+	return r.PostFormValue("username"), r.PostFormValue("password"), nil
+
+}
+
+func (a *App) registerHandler(w http.ResponseWriter, r *http.Request) {
+	username, password, err := extractUserNameAndPassword(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	err = a.storeUser(username, password)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	w.WriteHeader(http.StatusCreated)
 }
 
-func loginHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(w, "Hello")
+func (a *App) storeSession() (string, error) {
+	session := make([]byte, 16)
+	_, err := rand.Read(session)
+	if err != nil {
+		return "", err
+	}
+
+	hexedSession := hex.EncodeToString(session)
+	_, err = a.db.Exec("INSERT INTO sessions(session) VALUES(?)", hexedSession)
+	if err != nil {
+		return "", err
+	}
+
+	return hexedSession, nil
+}
+
+func (a *App) loginHandler(w http.ResponseWriter, r *http.Request) {
+	username, password, err := extractUserNameAndPassword(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var salt, storedEncryptedPassword string
+	err = a.db.QueryRow("SELECT salt, encrypted_password FROM users WHERE username=?", username).Scan(&salt, &storedEncryptedPassword)
+	switch {
+	case err == sql.ErrNoRows:
+		http.Error(w, "login failed", http.StatusUnauthorized)
+		return
+	case err != nil:
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	decodedSalt, err := hex.DecodeString(salt)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	generatedEncryptedPassword, err := encryptPassword(decodedSalt, password)
+	if hex.EncodeToString(generatedEncryptedPassword) != storedEncryptedPassword {
+		http.Error(w, "login failed", http.StatusUnauthorized)
+		return
+	}
+
+	session, err := a.storeSession()
+
+	w.WriteHeader(http.StatusOK)
+	http.SetCookie(w, &http.Cookie{Name: "sessionid", Value: session})
 }
 
 func authenticatedHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(w, "Hello")
+	fmt.Println("in authenticated")
+	w.WriteHeader(http.StatusOK)
 }
 
 func resetHandler(w http.ResponseWriter, r *http.Request) {
@@ -35,8 +153,19 @@ func resetHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	http.Handle("/register", http.HandlerFunc(registerHandler))
-	http.Handle("/login", http.HandlerFunc(loginHandler))
+	db, err := sql.Open("sqlite3", "./users.db")
+	if err != nil {
+		fmt.Printf("err = %+v\n", err)
+		return
+	}
+	defer db.Close()
+
+	app := App{
+		db: db,
+	}
+
+	http.Handle("/register", http.HandlerFunc(app.registerHandler))
+	http.Handle("/login", http.HandlerFunc(app.loginHandler))
 	http.Handle("/authenticated", http.HandlerFunc(authenticatedHandler))
 	http.Handle("/reset", http.HandlerFunc(resetHandler))
 
