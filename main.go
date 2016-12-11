@@ -61,7 +61,7 @@ func (a *App) storeUser(username, password string) error {
 	return err
 }
 
-func extractUserNameAndPassword(r *http.Request) (string, string, error) {
+func usernameAndPasswordFromForm(r *http.Request) (string, string, error) {
 	if err := r.ParseForm(); err != nil {
 		return "", "", err
 	}
@@ -77,7 +77,7 @@ func extractUserNameAndPassword(r *http.Request) (string, string, error) {
 }
 
 func (a *App) registerHandler(w http.ResponseWriter, r *http.Request) {
-	username, password, err := extractUserNameAndPassword(r)
+	username, password, err := usernameAndPasswordFromForm(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -109,7 +109,7 @@ func (a *App) storeSession() (string, error) {
 }
 
 func (a *App) loginHandler(w http.ResponseWriter, r *http.Request) {
-	username, password, err := extractUserNameAndPassword(r)
+	username, password, err := usernameAndPasswordFromForm(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
