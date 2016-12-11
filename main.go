@@ -140,7 +140,6 @@ func (a *App) loginHandler(w http.ResponseWriter, r *http.Request) {
 
 	session, err := a.storeSession()
 
-	w.WriteHeader(http.StatusOK)
 	http.SetCookie(w, &http.Cookie{
 		Name:     "sessionid",
 		Value:    session,
