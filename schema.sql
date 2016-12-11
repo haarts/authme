@@ -10,4 +10,4 @@ CREATE TABLE `users` (
 CREATE TABLE `sessions` (
 	`session` VARCHAR NOT NULL,
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
-)
+);
