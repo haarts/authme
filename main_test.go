@@ -59,7 +59,7 @@ func TestAuthenticatedFailed(t *testing.T) {
 	assert.Equal(t, 401, w.Code)
 }
 
-func TestLoginHandler(t *testing.T) {
+func TestLoginSucceed(t *testing.T) {
 	db, err := initializeDatabase()
 	require.NoError(t, err)
 
