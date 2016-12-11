@@ -93,7 +93,7 @@ func (a *App) registerHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) storeSession() (string, error) {
-	session := make([]byte, 16)
+	session := make([]byte, 16*8)
 	_, err := rand.Read(session)
 	if err != nil {
 		return "", err
