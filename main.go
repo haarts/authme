@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pzduniak/argon2"
@@ -140,7 +141,14 @@ func (a *App) loginHandler(w http.ResponseWriter, r *http.Request) {
 	session, err := a.storeSession()
 
 	w.WriteHeader(http.StatusOK)
-	http.SetCookie(w, &http.Cookie{Name: "sessionid", Value: session})
+	http.SetCookie(w, &http.Cookie{
+		Name:     "sessionid",
+		Value:    session,
+		Expires:  time.Now().AddDate(0, 0, 7),
+		Secure:   true,
+		HttpOnly: true,
+		// TODO set domain
+	})
 }
 
 func authenticatedHandler(w http.ResponseWriter, r *http.Request) {
