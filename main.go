@@ -151,8 +151,24 @@ func (a *App) loginHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func authenticatedHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("in authenticated")
+func (a *App) authenticatedHandler(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie("sessionid")
+	if err != nil {
+		http.Error(w, "invalid session", http.StatusUnauthorized)
+		return
+	}
+
+	var session string
+	err = a.db.QueryRow("SELECT session FROM sessions WHERE session = ?", cookie.Value).Scan(&session)
+	switch {
+	case err == sql.ErrNoRows:
+		http.Error(w, "invalid session", http.StatusUnauthorized)
+		return
+	case err != nil:
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -174,7 +190,7 @@ func main() {
 
 	http.Handle("/register", http.HandlerFunc(app.registerHandler))
 	http.Handle("/login", http.HandlerFunc(app.loginHandler))
-	http.Handle("/authenticated", http.HandlerFunc(authenticatedHandler))
+	http.Handle("/authenticated", http.HandlerFunc(app.authenticatedHandler))
 	http.Handle("/reset", http.HandlerFunc(resetHandler))
 
 	log.Fatal(http.ListenAndServe(":8080", nil))

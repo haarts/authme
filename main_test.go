@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +13,51 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestAuthenticatedSucceed(t *testing.T) {
+	db, err := initializeDatabase()
+	require.NoError(t, err)
+
+	app := App{db: db}
+
+	session, err := app.storeSession()
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"http://example.com/foo",
+		nil,
+	)
+	req.AddCookie(&http.Cookie{
+		Name:  "sessionid",
+		Value: session,
+	})
+	w := httptest.NewRecorder()
+	app.authenticatedHandler(w, req)
+
+	assert.Equal(t, 200, w.Code)
+}
+
+func TestAuthenticatedFailed(t *testing.T) {
+	db, err := initializeDatabase()
+	require.NoError(t, err)
+
+	app := App{db: db}
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"http://example.com/foo",
+		nil,
+	)
+	req.AddCookie(&http.Cookie{
+		Name:  "sessionid",
+		Value: "some BS",
+	})
+	w := httptest.NewRecorder()
+	app.authenticatedHandler(w, req)
+
+	assert.Equal(t, 401, w.Code)
+}
 
 func TestLoginHandler(t *testing.T) {
 	db, err := initializeDatabase()
@@ -54,7 +98,6 @@ func TestLoginFailed(t *testing.T) {
 	w := httptest.NewRecorder()
 	app.loginHandler(w, req)
 
-	fmt.Printf("w = %+v\n", w)
 	assert.Equal(t, 401, w.Code)
 }
 
