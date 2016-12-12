@@ -11,7 +11,6 @@ It uses Argon2 for password encryption which is totally rad nowadays.
 
 Authme is supposed to be used as middleware for Nginx. Configure Nginx like so:
 
-
 ```
 server {
 	listen 80; # You of course use TLS, but let's not complicate matters here.
@@ -51,3 +50,15 @@ this endpoint is only meant for internal Nginx usage.
 As we don't want our authentication middleware to concern itself with how
 authentication failures are handled we use the named `@error401` to turn a 401
 into a 301.
+
+## Storage
+
+SQlite3 is used as a storage backend. That should be good for 90% of the use
+cases. And if it isn't; the Sqlite3 driver is `database/sql` compatible so
+you're one import line away from any other database.
+
+Initializing databases was never so sexy:
+
+```
+$ sqlite3 users.db < schema.sql
+```
