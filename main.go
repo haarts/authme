@@ -6,11 +6,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"time"
 
+	log "github.com/Sirupsen/logrus"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pzduniak/argon2"
 )
@@ -78,6 +78,7 @@ func usernameAndPasswordFromForm(r *http.Request) (string, string, error) {
 }
 
 func (a *App) registerHandler(w http.ResponseWriter, r *http.Request) {
+	log.Info("register")
 	username, password, err := usernameAndPasswordFromForm(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -110,6 +111,7 @@ func (a *App) storeSession() (string, error) {
 }
 
 func (a *App) loginHandler(w http.ResponseWriter, r *http.Request) {
+	log.Info("login")
 	username, password, err := usernameAndPasswordFromForm(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -152,6 +154,7 @@ func (a *App) loginHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) authenticatedHandler(w http.ResponseWriter, r *http.Request) {
+	log.Info("authenticated")
 	cookie, err := r.Cookie("sessionid")
 	if err != nil {
 		http.Error(w, "invalid session", http.StatusUnauthorized)
