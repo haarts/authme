@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -176,7 +177,8 @@ func resetHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	db, err := sql.Open("sqlite3", "./users.db")
+	log.WithField("database", os.Getenv("USER_DATABASE")).Info("startup")
+	db, err := sql.Open("sqlite3", os.Getenv("USER_DATABASE"))
 	if err != nil {
 		fmt.Printf("err = %+v\n", err)
 		return
