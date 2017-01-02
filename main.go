@@ -25,6 +25,7 @@ func secureSalt() ([]byte, error) {
 
 	_, err := rand.Read(salt)
 	if err != nil {
+		log.WithField("err", err).Error("Failed to generate salt")
 		return salt, err
 	}
 
@@ -35,6 +36,7 @@ func encryptPassword(salt []byte, password string) ([]byte, error) {
 	// TODO check out these parameters
 	encryptedPassword, err := argon2.Key([]byte(password), salt, 13, 4, 4096, 32, argon2.Argon2i)
 	if err != nil {
+		log.WithField("err", err).Error("Failed to generate password")
 		return []byte{}, err
 	}
 
@@ -58,12 +60,14 @@ func (a *App) storeUser(username, password string) error {
 		hex.EncodeToString(encryptedPassword),
 		hex.EncodeToString(salt),
 	)
+	log.WithField("err", err).Error("Failed to store user")
 
 	return err
 }
 
 func usernameAndPasswordFromForm(r *http.Request) (string, string, error) {
 	if err := r.ParseForm(); err != nil {
+		log.WithField("err", err).Error("Failed to parse form")
 		return "", "", err
 	}
 	if r.PostFormValue("username") == "" {
@@ -98,12 +102,14 @@ func (a *App) storeSession() (string, error) {
 	session := make([]byte, 16*8)
 	_, err := rand.Read(session)
 	if err != nil {
+		log.WithField("err", err).Error("Failed to generate random session data")
 		return "", err
 	}
 
 	hexedSession := hex.EncodeToString(session)
 	_, err = a.db.Exec("INSERT INTO sessions(session) VALUES(?)", hexedSession)
 	if err != nil {
+		log.WithField("err", err).Error("Failed to insert session")
 		return "", err
 	}
 
@@ -131,6 +137,7 @@ func (a *App) loginHandler(w http.ResponseWriter, r *http.Request) {
 
 	decodedSalt, err := hex.DecodeString(salt)
 	if err != nil {
+		log.WithField("err", err).Error("Failed to decode salt")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -183,7 +190,7 @@ func main() {
 	log.WithField("database", os.Getenv("USER_DATABASE")).Info("startup")
 	db, err := sql.Open("sqlite3", os.Getenv("USER_DATABASE"))
 	if err != nil {
-		fmt.Printf("err = %+v\n", err)
+		log.WithField("err", err).Error("Failed to open database")
 		return
 	}
 	defer db.Close()
