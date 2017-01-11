@@ -60,7 +60,11 @@ func (a *App) storeUser(username, password string) error {
 		hex.EncodeToString(encryptedPassword),
 		hex.EncodeToString(salt),
 	)
-	log.WithField("err", err).Error("Failed to store user")
+	if err != nil {
+		log.WithField("err", err).Error("Failed to store user")
+	} else {
+		log.WithField("username", username).Error("Stored new user")
+	}
 
 	return err
 }
